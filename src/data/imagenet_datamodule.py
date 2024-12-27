@@ -2,6 +2,9 @@ import pytorch_lightning as pl
 from torch.utils.data import DataLoader
 from torchvision import transforms
 from torchvision.datasets import ImageNet
+import os
+import torch
+import psutil
 
 class ImageNetDataModule(pl.LightningDataModule):
     def __init__(
@@ -14,8 +17,19 @@ class ImageNetDataModule(pl.LightningDataModule):
         super().__init__()
         self.data_dir = data_dir
         self.batch_size = batch_size
-        self.num_workers = num_workers
-        self.pin_memory = pin_memory
+        
+        # Automatically determine optimal number of workers
+        if num_workers == -1:
+            self.num_workers = os.cpu_count()
+        else:
+            self.num_workers = num_workers
+            
+        # Enable pin_memory only if CUDA is available
+        self.pin_memory = pin_memory and torch.cuda.is_available()
+        
+        # Adjust prefetch factor based on available memory
+        total_ram = psutil.virtual_memory().total / (1024 * 1024 * 1024)  # GB
+        self.prefetch_factor = 2 if total_ram >= 32 else 1
         
         # Standard ImageNet transforms
         self.train_transforms = transforms.Compose([
@@ -54,10 +68,10 @@ class ImageNetDataModule(pl.LightningDataModule):
             batch_size=self.batch_size,
             shuffle=True,
             num_workers=self.num_workers,
-            pin_memory=True,
-            persistent_workers=True,
-            prefetch_factor=2,  # Prefetch 2 batches per worker
-            drop_last=True,  # Important for multi-GPU training
+            pin_memory=self.pin_memory,
+            persistent_workers=True if self.num_workers > 0 else False,
+            prefetch_factor=self.prefetch_factor if self.num_workers > 0 else None,
+            drop_last=True,
         )
     
     def val_dataloader(self):

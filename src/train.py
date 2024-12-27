@@ -113,6 +113,21 @@ def parse_args():
     debug.add_argument('--dry-run', action='store_true',
                       help='Run full training loop with minimal data')
     
+    # Scaling options
+    scaling = parser.add_argument_group('Scaling Options')
+    scaling.add_argument('--auto-scale-batch-size', action='store_true',
+                        help='Automatically find the largest batch size that fits in memory')
+    scaling.add_argument('--auto-lr-find', action='store_true',
+                        help='Automatically find optimal learning rate')
+    scaling.add_argument('--scale-lr', action='store_true',
+                        help='Scale learning rate with batch size')
+    scaling.add_argument('--base-batch-size', type=int, default=256,
+                        help='Base batch size for scaling calculations')
+    scaling.add_argument('--min-batch-size', type=int, default=32,
+                        help='Minimum batch size when auto scaling')
+    scaling.add_argument('--max-batch-size', type=int, default=512,
+                        help='Maximum batch size when auto scaling')
+    
     return parser.parse_args()
 
 def main():
@@ -140,22 +155,51 @@ def main():
     
     lr_monitor = LearningRateMonitor(logging_interval='step')
     
-    # Initialize trainer with latest multi-GPU best practices
+    # Determine accelerator and devices based on system
+    if torch.cuda.is_available():
+        accelerator = "gpu"
+        if args.gpus == -1:
+            devices = torch.cuda.device_count()
+        else:
+            devices = min(args.gpus, torch.cuda.device_count())
+    else:
+        accelerator = "cpu"
+        devices = None
+        if args.gpus != 0:
+            print("Warning: No GPU available, falling back to CPU training")
+    
+    # Determine strategy based on hardware
+    if devices and devices > 1:
+        strategy = 'ddp_find_unused_parameters_false'
+        # Enable sync_batchnorm for multi-GPU
+        model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
+    else:
+        strategy = None  # Use default strategy for single GPU/CPU
+    
+    # Adjust batch size and learning rate for different setups
+    effective_batch_size = args.batch_size
+    if devices and devices > 1:
+        effective_batch_size *= devices
+    
+    # Scale learning rate with batch size
+    scaled_lr = args.learning_rate * (effective_batch_size / 256)
+    
+    # Initialize trainer with hardware-aware settings
     trainer = pl.Trainer(
         max_epochs=args.epochs,
-        accelerator='gpu',
-        devices=args.gpus,
-        strategy='ddp_find_unused_parameters_false',  # More efficient than basic DDP
-        precision=args.precision,
+        accelerator=accelerator,
+        devices=devices,
+        strategy=strategy,
+        precision=args.precision if accelerator == "gpu" else "32",
         callbacks=[checkpoint_callback, lr_monitor],
         logger=logger,
         log_every_n_steps=50,
-        sync_batchnorm=True,  # Important for multi-GPU training
-        use_distributed_sampler=True,
+        sync_batchnorm=True if devices and devices > 1 else False,
+        use_distributed_sampler=True if devices and devices > 1 else False,
         gradient_clip_val=args.grad_clip,
         accumulate_grad_batches=args.grad_accum,
-        deterministic=False,  # Set to True only if you need exact reproducibility
-        benchmark=True,  # Improves speed if input sizes don't change
+        deterministic=False,
+        benchmark=True if accelerator == "gpu" else False,
         # Testing options
         fast_dev_run=args.fast_dev_run,
         limit_train_batches=args.limit_train_batches,
