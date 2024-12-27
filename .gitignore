@@ -1,0 +1,108 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+env/
+ENV/
+.env
+.venv
+env.bak/
+venv.bak/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Jupyter Notebook
+.ipynb_checkpoints
+*.ipynb
+
+# Training artifacts
+checkpoints/
+runs/
+outputs/
+logs/
+wandb/
+*.ckpt
+*.pth
+*.pt
+events.out.tfevents.*
+
+# Dataset
+data/
+datasets/
+imagenet/
+ILSVRC/
+*.JPEG
+*.jpg
+*.png
+*.tar
+*.zip
+
+# Logs and debugging
+*.log
+*.out
+*.err
+.DS_Store
+.coverage
+htmlcov/
+.pytest_cache/
+.coverage.*
+
+# Kaggle
+kaggle.json
+
+# Environment variables
+.env
+.env.*
+
+# Large files
+*.hdf5
+*.h5
+*.pkl
+*.npy
+*.npz
+
+# Temporary files
+tmp/
+temp/
+.temp/
+*.tmp
+
+# Model weights and configurations
+*.weights
+*.cfg
+*.yaml
+model_best.pth.tar
+
+# Profiling
+*.prof
+*.trace
+*.nvvp
+
+# Documentation
+docs/_build/
+docs/generated/ 
